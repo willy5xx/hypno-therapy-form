@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindset Questionnaire</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 0 auto;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .status-message {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .required {
+            color: #e74c3c;
+        }
+        .char-count {
+            text-align: right;
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Mindset Questionnaire</h2>
+    <form id="userForm">
+        <div class="form-group">
+            <label for="question1">1. What specific thoughts, feelings, or behaviors are you struggling with? <span class="required">*</span></label>
+            <textarea id="question1" rows="4" maxlength="500" required></textarea>
+            <div class="char-count"><span id="q1-count">0</span>/500 characters</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="question2">2. If you could change your mindset instantly, what would you want to feel and experience instead? <span class="required">*</span></label>
+            <textarea id="question2" rows="4" maxlength="500" required></textarea>
+            <div class="char-count"><span id="q2-count">0</span>/500 characters</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="question3">3. Are there specific triggers or situations that bring out these challenges? <span class="required">*</span></label>
+            <textarea id="question3" rows="4" maxlength="500" required></textarea>
+            <div class="char-count"><span id="q3-count">0</span>/500 characters</div>
+        </div>
+        
+        <button type="submit" id="submitButton">Submit</button>
+        
+        <div class="loading" id="loadingIndicator">
+            Submitting your responses...
+        </div>
+        
+        <div class="status-message" id="statusMessage"></div>
+    </form>
+
+    <script>
+        // Configuration - replace with your actual webhook URL
+        const CONFIG = {
+            webhookUrl: "YOUR_N8N_WEBHOOK_URL_HERE"
+        };
+        
+        // DOM Elements
+        const form = document.getElementById("userForm");
+        const submitButton = document.getElementById("submitButton");
+        const loadingIndicator = document.getElementById("loadingIndicator");
+        const statusMessage = document.getElementById("statusMessage");
+        const textareas = document.querySelectorAll("textarea");
+        
+        // Character counters
+        document.getElementById("question1").addEventListener("input", function() {
+            document.getElementById("q1-count").textContent = this.value.length;
+        });
+        
+        document.getElementById("question2").addEventListener("input", function() {
+            document.getElementById("q2-count").textContent = this.value.length;
+        });
+        
+        document.getElementById("question3").addEventListener("input", function() {
+            document.getElementById("q3-count").textContent = this.value.length;
+        });
+        
+        // Form submission
+        form.addEventListener("submit", async function(event) {
+            event.preventDefault();
+            
+            // Validate form
+            let isValid = true;
+            textareas.forEach(textarea => {
+                if (!textarea.value.trim()) {
+                    isValid = false;
+                    textarea.style.borderColor = "#e74c3c";
+                } else {
+                    textarea.style.borderColor = "#ddd";
+                }
+            });
+            
+            if (!isValid) {
+                showStatus("Please answer all required questions.", "error");
+                return;
+            }
+            
+            // Prepare data
+            const data = {
+                question1: document.getElementById("question1").value.trim(),
+                question2: document.getElementById("question2").value.trim(),
+                question3: document.getElementById("question3").value.trim(),
+                timestamp: new Date().toISOString()
+            };
+            
+            // Show loading state
+            submitButton.disabled = true;
+            loadingIndicator.style.display = "block";
+            statusMessage.style.display = "none";
+            
+            try {
+                const response = await fetch(CONFIG.webhookUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showStatus("Thank you for your responses! We'll process your information shortly.", "success");
+                    form.reset();
+                    textareas.forEach(textarea => {
+                        const id = textarea.id;
+                        document.getElementById(`${id.slice(0, 2)}-count`).textContent = "0";
+                    });
+                } else {
+                    const errorData = await response.json().catch(() => null);
+                    throw new Error(errorData?.message || "Server error");
+                }
+            } catch (error) {
+                console.error("Submission error:", error);
+                showStatus("There was a problem submitting your responses. Please try again later.", "error");
+            } finally {
+                submitButton.disabled = false;
+                loadingIndicator.style.display = "none";
+            }
+        });
+        
+        // Helper function to show status messages
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = "status-message " + type;
+            statusMessage.style.display = "block";
+            
+            // Scroll to status message
+            statusMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    </script>
+</body>
+</html>
